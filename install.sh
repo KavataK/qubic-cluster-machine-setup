@@ -49,13 +49,13 @@ sudo mkdir -p /mnt/qubic
 # Download and install VirtualBox
 echo "Downloading VirtualBox and extension pack..."
 wget -q https://download.virtualbox.org/virtualbox/7.1.4/virtualbox-7.1_7.1.4-165100~Ubuntu~jammy_amd64.deb -O /tmp/virtualbox.deb
-wget -q https://download.virtualbox.org/virtualbox/7.1.4/Oracle_VirtualBox_Extension_Pack-7.1.4.vbox-extpack -O /tmp/extpack.vbox-extpack
+wget -q "https://download.virtualbox.org/virtualbox/7.1.4/Oracle_VirtualBox_Extension_Pack-7.1.4.vbox-extpack" -O "/tmp/Oracle_VirtualBox_Extension_Pack-7.1.4.vbox-extpack"
 
 echo "Installing VirtualBox..."
 sudo dpkg -i /tmp/virtualbox.deb || sudo apt-get install -f -y
 
 echo "Installing VirtualBox Extension Pack..."
-sudo VBoxManage extpack install Oracle_VirtualBox_Extension_Pack-7.1.4.vbox-extpack --accept-license=eb31505e56e9b4d0fbca139104da41ac6f6b98f8e78968bdf01b1f3da3c4f9ae
+sudo VBoxManage extpack install "/tmp/Oracle_VirtualBox_Extension_Pack-7.1.4.vbox-extpack" --replace --accept-license=56be48f923303c8cababb0bb4e4786b0e0e2e5011f99d3a2c6d1c6508b8ae83c
 
 # Configure VirtualBox kernel modules
 sudo modprobe -r vboxnetflt vboxnetadp vboxpci vboxdrv || true
