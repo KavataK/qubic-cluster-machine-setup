@@ -2,66 +2,76 @@
 
 set -e
 
-# === Helper function ===
-echo_info() {
-    echo -e "\n\033[1;34m[INFO]\033[0m $1\n"
-}
+# Get the directory where the script is located
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+cd "$SCRIPT_DIR"
 
-# === Step 1: Download and extract 32GBVHD.zip in background ===
-echo_info "Downloading 32GBVHD.zip from Google Drive..."
-gdown --id 1XioJ68w7YLWjx2CBDhOVuy-9oBYdh6a4 --no-cookies --quiet
+# Google Drive file IDs
+FILE_ID_32GB="1XioJ68w7YLWjx2CBDhOVuy-9oBYdh6a4"
+FILE_ID_BASE184="1LDpOtI7l5chRaFzCcQ5p498gmTEcU8pG"
 
-echo_info "Extracting 32GBVHD.zip to /root (in background)..."
-unzip -o 32GBVHD.zip -d /root/ &
+echo "Installing gdown if not present..."
+if ! command -v gdown &> /dev/null; then
+    sudo apt update && sudo apt install -y python3-pip
+    pip3 install gdown
+fi
 
-bg_unzip_pid=$!
+# Download the zip files
+echo "Downloading 32GBVHD.zip from Google Drive..."
+gdown --id "$FILE_ID_32GB" -O 32GBVHD.zip
 
-# === Step 2: Download and extract 154base.zip ===
-echo_info "Downloading 154base.zip from Google Drive..."
-gdown --id 1x2b_GIxOsLYSTwB1ZnERZVwi6TUPF59m --no-cookies --quiet
+echo "Downloading base184.zip from Google Drive..."
+gdown --id "$FILE_ID_BASE184" -O base184.zip
 
-echo_info "Creating /root/filesForVHD and extracting 154base.zip..."
+# Unzip 32GBVHD.zip in background
+echo "Unzipping 32GBVHD.zip in background to /root/..."
+unzip -o 32GBVHD.zip -d /root/ > /dev/null &
+ZIP_PID=$!
+
+# Unzip base184.zip to /root/filesForVHD
+echo "Creating /root/filesForVHD and unzipping base184.zip..."
 mkdir -p /root/filesForVHD
-unzip -o 154base.zip -d /root/filesForVHD
+unzip -o base184.zip -d /root/filesForVHD > /dev/null
 
-# === Step 3: Install required packages ===
-echo_info "Installing required packages..."
+# Install required packages
+echo "Installing required packages..."
 
-apt update
-apt install -y freerdp2-x11 git docker.io libxcb-cursor0 sshpass \
+export DEBIAN_FRONTEND=noninteractive
+
+sudo apt-get update
+sudo apt-get install -y freerdp2-x11 git docker.io libxcb-cursor0 sshpass \
     gcc-12 g++-12 dkms build-essential linux-headers-$(uname -r) \
-    gcc make perl tree tmux
+    gcc make perl tree tmux wget
 
-# === Step 4: Download and install VirtualBox ===
-echo_info "Downloading and installing VirtualBox..."
-wget https://download.virtualbox.org/virtualbox/7.1.4/virtualbox-7.1_7.1.4-165100~Ubuntu~jammy_amd64.deb
-dpkg -i virtualbox-7.1_7.1.4-165100~Ubuntu~jammy_amd64.deb || apt -f install -y
+# Create directory for qubic
+sudo mkdir -p /mnt/qubic
 
-# === Step 5: Download and install Extension Pack ===
-echo_info "Downloading VirtualBox Extension Pack..."
-wget https://download.virtualbox.org/virtualbox/7.1.4/Oracle_VirtualBox_Extension_Pack-7.1.4.vbox-extpack
+# Download and install VirtualBox
+echo "Downloading VirtualBox and extension pack..."
+wget -q https://download.virtualbox.org/virtualbox/7.1.4/virtualbox-7.1_7.1.4-165100~Ubuntu~jammy_amd64.deb -O /tmp/virtualbox.deb
+wget -q https://download.virtualbox.org/virtualbox/7.1.4/Oracle_VirtualBox_Extension_Pack-7.1.4.vbox-extpack -O /tmp/extpack.vbox-extpack
 
-echo_info "Installing Extension Pack..."
-VBoxManage extpack install Oracle_VirtualBox_Extension_Pack-7.1.4.vbox-extpack --accept-license=eb31505e56e9b4d0fbca139104da41ac6f6b98f8e78968bdf01b1f3da3c4f9ae
+echo "Installing VirtualBox..."
+sudo dpkg -i /tmp/virtualbox.deb || sudo apt-get install -f -y
 
-# === Step 6: Reconfigure VirtualBox Kernel Modules ===
-modprobe -r vboxnetflt vboxnetadp vboxpci vboxdrv || true
-/sbin/vboxconfig || true
+echo "Installing VirtualBox Extension Pack..."
+sudo VBoxManage extpack install Oracle_VirtualBox_Extension_Pack-7.1.4.vbox-extpack --accept-license=eb31505e56e9b4d0fbca139104da41ac6f6b98f8e78968bdf01b1f3da3c4f9ae
 
-# === Step 7: Clone qubic_docker repository ===
-echo_info "Cloning qubic_docker repo to /root/"
+# Configure VirtualBox kernel modules
+sudo modprobe -r vboxnetflt vboxnetadp vboxpci vboxdrv || true
+sudo /sbin/vboxconfig
+
+# Clone qubic_docker
+echo "Cloning Qubic Docker repository..."
 git clone https://github.com/icyblob/qubic_docker.git /root/qubic_docker
 
-# === Step 8: Clean up ===
-echo_info "Removing installation files..."
-rm -f virtualbox-7.1_7.1.4-165100~Ubuntu~jammy_amd64.deb
-rm -f Oracle_VirtualBox_Extension_Pack-7.1.4.vbox-extpack
-rm -f 32GBVHD.zip 154base.zip
+# Wait for background unzip
+echo "Waiting for 32GBVHD.zip unzip to finish..."
+wait $ZIP_PID
+echo "Unzipping of 32GBVHD.zip completed."
 
-# === Step 9: Wait for background unzip ===
-echo_info "Waiting for background unzip process to finish..."
-wait $bg_unzip_pid
-echo_info "32GBVHD.zip successfully extracted."
+# Cleanup
+echo "Cleaning up temporary files..."
+rm -f 32GBVHD.zip base184.zip /tmp/virtualbox.deb /tmp/extpack.vbox-extpack
 
-echo_info "Setup completed successfully."
-
+echo "Setup completed successfully!"
